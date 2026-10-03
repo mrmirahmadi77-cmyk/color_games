@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>بازی حدس پرچم</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Tahoma, Arial, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  color: #fff;
+  direction: rtl;
+  background: radial-gradient(circle at 50% -10%, #1e3a8a 0%, transparent 55%), radial-gradient(circle at 100% 100%, #4c1d95 0%, transparent 50%), #0a0e1a;
+}
+.app {
+  width: 100%; max-width: 540px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 26px; padding: 18px;
+  box-shadow: 0 26px 70px rgba(0,0,0,.6);
+}
+.top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.pill {
+  background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.1);
+  padding: 7px 13px; border-radius: 999px; font-size: 13px; font-weight: 600;
+}
+.pill.score { color: #facc15; }
+.progress { height: 8px; background: rgba(255,255,255,.1); border-radius: 999px; overflow: hidden; margin-bottom: 16px; }
+.bar { height: 100%; width: 0%; background: linear-gradient(90deg, #22d3ee, #a78bfa); transition: width .4s; }
+.flag-box {
+  width: 100%; height: min(36vh, 240px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 14px; border-radius: 20px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1);
+  margin-bottom: 14px;
+}
+.flag-box img { max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 14px 34px rgba(0,0,0,.55); }
+.flag-code { font-size: 42px; font-weight: 700; color: #facc15; letter-spacing: 2px; }
+.question { text-align: center; font-size: 15px; color: rgba(255,255,255,.75); margin-bottom: 14px; }
+.options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.option {
+  font-family: inherit; font-size: 14px; font-weight: 600; color: #fff;
+  padding: 15px 8px; min-height: 56px; border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.07);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  text-align: center; line-height: 1.4; transition: .18s;
+}
+.option:hover:not(.disabled) { background: rgba(255,255,255,.17); }
+.option.disabled { cursor: default; }
+.option.correct { background: #16a34a; border-color: #4ade80; }
+.option.wrong { background: #dc2626; border-color: #f87171; }
+.option.hidden { opacity: .15; pointer-events: none; }
+.bottom { display: flex; gap: 10px; margin-top: 14px; }
+.bottom button {
+  flex: 1; font-family: inherit; font-size: 13px; font-weight: 600;
+  padding: 12px; border-radius: 13px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.07);
+  color: #fff;
+}
+.bottom button:hover:not(:disabled) { background: rgba(255,255,255,.16); }
+.bottom button:disabled { opacity: .35; cursor: default; }
+#hintBtn { color: #67e8f9; }
+#resetBtn { color: #fca5a5; }
+.hide { display: none !important; }
+#endScreen { text-align: center; padding: 26px 10px; }
+#endScreen .emoji { font-size: 68px; margin-bottom: 10px; }
+#endScreen h2 { font-size: 24px; margin-bottom: 12px; }
+#endScreen p { color: rgba(255,255,255,.75); margin-bottom: 22px; }
+#endScreen strong { color: #facc15; font-size: 20px; }
+#playAgain {
+  font-family: inherit; font-size: 15px; font-weight: 700;
+  padding: 14px 40px; border-radius: 14px; border: none; cursor: pointer;
+  color: #06121f; background: linear-gradient(90deg, #22d3ee, #a78bfa);
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div id="gameScreen">
+    <div class="top">
+      <div class="pill" id="levelText">مرحله ۱ از ۲۰۰</div>
+      <div class="pill score">امتیاز: <span id="scoreText">۰</span></div>
+
+</div>
+    <div class="progress"><div class="bar" id="bar"></div></div>
+    <div class="flag-box">
+      <img id="flagImg" alt="پرچم">
+    </div>
+    <p class="question">این پرچم مربوط به کدام کشور است؟</p>
+    <div class="options" id="options"></div>
+    <div class="bottom">
+      <button id="hintBtn" type="button">حذف دو گزینه (۳)</button>
+      <button id="resetBtn" type="button">شروع دوباره</button>
+    </div>
+  </div>
+
+  <div id="endScreen" class="hide">
+    <div class="emoji">🏆</div>
+    <h2>بازی تموم شد!</h2>
+    <p>امتیاز نهایی: <strong id="finalScore">۰</strong> از ۲۰۰۰</p>
+    <button id="playAgain" type="button">بازی دوباره</button>
+  </div>
+</div>
+
+<script>
+var COUNTRIES = [
+  ['ir','ایران'],['af','افغانستان'],['al','آلبانی'],['dz','الجزایر'],['ad','آندورا'],
+  ['ao','آنگولا'],['ag','آنتیگوا و باربودا'],['ar','آرژانتین'],['am','ارمنستان'],['au','استرالیا'],
+  ['at','اتریش'],['az','جمهوری آذربایجان'],['bs','باهاما'],['bh','بحرین'],['bd','بنگلادش'],
+  ['bb','باربادوس'],['by','بلاروس'],['be','بلژیک'],['bz','بلیز'],['bj','بنین'],
+  ['bt','بوتان'],['bo','بولیوی'],['ba','بوسنی و هرزگوین'],['bw','بوتسوانا'],['br','برزیل'],
+  ['bn','برونئی'],['bg','بلغارستان'],['bf','بورکینافاسو'],['bi','بوروندی'],['kh','کامبوج'],
+  ['cm','کامرون'],['ca','کانادا'],['cv','کیپ ورد'],['cf','جمهوری آفریقای مرکزی'],['td','چاد'],
+  ['cl','شیلی'],['cn','چین'],['co','کلمبیا'],['km','کومور'],['cg','جمهوری کنگو'],
+  ['cd','جمهوری دموکراتیک کنگو'],['cr','کاستاریکا'],['ci','ساحل عاج'],['hr','کرواسی'],['cu','کوبا'],
+  ['cy','قبرس'],['cz','جمهوری چک'],['dk','دانمارک'],['dj','جیبوتی'],['dm','دومینیکا'],
+  ['do','جمهوری دومینیکن'],['ec','اکوادور'],['eg','مصر'],['sv','السالوادور'],['gq','گینه استوایی'],
+  ['er','اریتره'],['ee','استونی'],['sz','اسواتینی'],['et','اتیوپی'],['fj','فیجی'],
+  ['fi','فنلاند'],['fr','فرانسه'],['ga','گابن'],['gm','گامبیا'],['ge','گرجستان'],
+  ['de','آلمان'],['gh','غنا'],['gr','یونان'],['gd','گرنادا'],['gt','گواتمالا'],
+  ['gn','گینه'],['gw','گینه بیسائو'],['gy','گویان'],['ht','هائیتی'],['hn','هندوراس'],
+  ['hu','مجارستان'],['is','ایسلند'],['in','هند'],['id','اندونزی'],['iq','عراق'],
+  ['ie','ایرلند'],['il','اسرائیل'],['it','ایتالیا'],['jm','جامائیکا'],['jp','ژاپن'],
+  ['jo','اردن'],['kz','قزاقستان'],['ke','کنیا'],['ki','کیریباتی'],['kp','کره شمالی'],
+  ['kr','کره جنوبی'],['kw','کویت'],['kg','قرقیزستان'],['la','لائوس'],['lv','لتونی'],
+  ['lb','لبنان'],['ls','لسوتو'],['lr','لیبریا'],['ly','لیبی'],['li','لیختن‌اشتاین'],
+  ['lt','لیتوانی'],['lu','لوکزامبورگ'],['mg','ماداگاسکار'],['mw','مالاوی'],['my','مالزی'],
+  ['mv','مالدیو'],['ml','مالی'],['mt','مالت'],['mh','جزایر مارشال'],['mr','موریتانی'],
+  ['mu','موریس'],['mx','مکزیک'],['fm','میکرونزی'],['md','مولداوی'],['mc','موناکو'],
+  ['mn','مغولستان'],['me','مونته‌نگرو'],['ma','مراکش'],['mz','موزامبیک'],['mm','میانمار'],
+  ['na','نامیبیا'],['nr','نائورو'],['np','نپال'],['nl','هلند'],['nz','نیوزیلند'],
+  ['ni','نیکاراگوئه'],['ne','نیجر'],['ng','نیجریه'],['mk','مقدونیه شمالی'],['no','نروژ'],
+  ['om','عمان'],['pk','پاکستان'],['pw','پالائو'],['ps','فلسطین'],['pa','پاناما'],
+  ['pg','پاپوآ گینه نو'],['py','پاراگوئه'],['pe','پرو'],['ph','فیلیپین'],['pl','لهستان'],
+  ['pt','پرتغال'],['qa','قطر'],['ro','رومانی'],['ru','روسیه'],['rw','رواندا'],
+  ['kn','سنت کیتس و نویس'],['lc','سنت لوسیا'],['vc','سنت وینسنت و گرنادین'],['ws','ساموآ'],['sm','سان مارینو'],
+  ['st','سائوتومه و پرینسیپ'],['sa','عربستان سعودی'],['sn','سنگال'],['rs','صربستان'],['sc','سیشل'],
+  ['sl','سیرالئون'],['sg','سنگاپور'],['sk','اسلواکی'],['si','اسلوونی'],['sb','جزایر سلیمان'],
+  ['so','سومالی'],['za','آفریقای جنوبی'],['ss','سودان جنوبی'],['es','اسپانیا'],['lk','سریلانکا'],
+  ['sd','سودان'],['sr','سورینام'],['se','سوئد'],['ch','سوئیس'],['sy','سوریه'],
+  ['tw','تایوان'],['tj','تاجیکستان'],['tz','تانزانیا'],['th','تایلند'],['tl','تیمور شرقی'],
+
+['tg','توگو'],['to','تونگا'],['tt','ترینیداد و توباگو'],['tn','تونس'],['tr','ترکیه'],
+  ['tm','ترکمنستان'],['tv','تووالو'],['ug','اوگاندا'],['ua','اوکراین'],['ae','امارات متحده عربی'],
+  ['gb','بریتانیا'],['us','ایالات متحده آمریکا'],['uy','اروگوئه'],['uz','ازبکستان'],['vu','وانواتو'],
+  ['va','واتیکان'],['ve','ونزوئلا'],['vn','ویتنام'],['ye','یمن'],['zm','زامبیا'],
+  ['zw','زیمبابوه'],['xk','کوزوو'],['hk','هنگ‌کنگ'],['mo','ماکائو'],['gl','گرینلند']
+];
+
+var TOTAL = COUNTRIES.length;
+var STORAGE_KEY = 'flagQuizGame_v3';
+
+var els = {
+  gameScreen: document.getElementById('gameScreen'),
+  endScreen:  document.getElementById('endScreen'),
+  levelText:  document.getElementById('levelText'),
+  scoreText:  document.getElementById('scoreText'),
+  bar:        document.getElementById('bar'),
+  flagImg:    document.getElementById('flagImg'),
+  options:    document.getElementById('options'),
+  hintBtn:    document.getElementById('hintBtn'),
+  resetBtn:   document.getElementById('resetBtn'),
+  finalScore: document.getElementById('finalScore'),
+  playAgain:  document.getElementById('playAgain')
+};
+
+var state = { level: 1, score: 0, order: [], hintsLeft: 3 };
+var locked = false;
+var currentCorrect = -1;
+
+function fa(n) {
+  try { return Number(n).toLocaleString('fa-IR'); }
+  catch (e) { return String(n); }
+}
+
+function shuffle(arr) {
+  for (var i = arr.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  }
+  return arr;
+}
+
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch (e) {}
+}
+
+function loadState() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      var s = JSON.parse(raw);
+      if (s && s.order && s.order.length === TOTAL) {
+        state = s;
+        if (typeof state.hintsLeft !== 'number') state.hintsLeft = 3;
+        return true;
+      }
+    }
+  } catch (e) {}
+  return false;
+}
+
+function makeOrder() {
+  var arr = [];
+  for (var i = 0; i < TOTAL; i++) arr.push(i);
+  return shuffle(arr);
+}
+
+function newGame() {
+  state = { level: 1, score: 0, order: makeOrder(), hintsLeft: 3 };
+  saveState();
+  els.endScreen.classList.add('hide');
+  els.gameScreen.classList.remove('hide');
+  renderLevel();
+}
+
+function buildOptions(correctIdx) {
+  var set = {};
+  set[correctIdx] = true;
+  var count = 1;
+  while (count < 4) {
+    var r = Math.floor(Math.random() * TOTAL);
+    if (!set[r]) { set[r] = true; count++; }
+  }
+  var keys = [];
+  for (var k in set) keys.push(Number(k));
+  return shuffle(keys);
+}
+
+function setFlag(code, name) {
+  els.flagImg.alt = 'پرچم ' + name;
+  els.flagImg.onerror = function() {
+    var parent = els.flagImg.parentNode;
+    els.flagImg.style.display = 'none';
+    var fb = parent.querySelector('.flag-code');
+    if (!fb) {
+      fb = document.createElement('div');
+      fb.className = 'flag-code';
+      parent.appendChild(fb);
+    }
+    fb.textContent = code.toUpperCase();
+  };
+  els.flagImg.onload = function() {
+    var parent = els.flagImg.parentNode;
+    var fb = parent.querySelector('.flag-code');
+    if (fb) parent.removeChild(fb);
+    els.flagImg.style.display = 'block';
+  };
+  els.flagImg.src = 'https://flagcdn.com/w320/' + code + '.png';
+}
+
+function renderLevel() {
+  locked = false;
+
+  if (state.level > TOTAL) { renderEnd(); return; }
+
+  var correctIdx = state.order[state.level - 1];
+  currentCorrect = correctIdx;
+  var country = COUNTRIES[correctIdx];
+
+  els.levelText.textContent = 'مرحله ' + fa(state.level) + ' از ' + fa(TOTAL);
+  els.scoreText.textContent = fa(state.score);
+  els.bar.style.width = (((state.level - 1) / TOTAL) * 100) + '%';
+
+  setFlag(country[0], country[1]);
+
+  els.options.innerHTML = '';
+  var optIdxs = buildOptions(correctIdx);
+  for (var i = 0; i < optIdxs.length; i++) {
+
+(function(idx) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'option';
+      btn.textContent = COUNTRIES[idx][1];
+      btn.setAttribute('data-idx', String(idx));
+      btn.onclick = function() { choose(btn, idx === correctIdx, correctIdx); };
+      els.options.appendChild(btn);
+    })(optIdxs[i]);
+  }
+
+  els.hintBtn.textContent = 'حذف دو گزینه (' + fa(state.hintsLeft) + ')';
+  els.hintBtn.disabled = state.hintsLeft <= 0;
+}
+
+function choose(btn, isCorrect, correctIdx) {
+  if (locked) return;
+  locked = true;
+
+  var kids = els.options.children;
+  for (var i = 0; i < kids.length; i++) {
+    var b = kids[i];
+    b.classList.add('disabled');
+    if (Number(b.getAttribute('data-idx')) === correctIdx) {
+      b.classList.add('correct');
+    }
+  }
+
+  if (isCorrect) {
+    state.score += 10;
+  } else {
+    btn.classList.remove('correct');
+    btn.classList.add('wrong');
+  }
+
+  els.scoreText.textContent = fa(state.score);
+  saveState();
+
+  setTimeout(function() {
+    state.level++;
+    saveState();
+    renderLevel();
+  }, isCorrect ? 750 : 1300);
+}
+
+els.hintBtn.onclick = function() {
+  if (locked) return;
+  if (state.hintsLeft <= 0) return;
+
+  var wrongBtns = [];
+  var kids = els.options.children;
+  for (var i = 0; i < kids.length; i++) {
+    var b = kids[i];
+    var idx = Number(b.getAttribute('data-idx'));
+    if (idx !== currentCorrect && b.className.indexOf('hidden') === -1) {
+      wrongBtns.push(b);
+    }
+  }
+  if (wrongBtns.length <= 2) return;
+
+  shuffle(wrongBtns);
+  wrongBtns[0].classList.add('hidden');
+  wrongBtns[1].classList.add('hidden');
+
+  state.hintsLeft--;
+  els.hintBtn.textContent = 'حذف دو گزینه (' + fa(state.hintsLeft) + ')';
+  els.hintBtn.disabled = state.hintsLeft <= 0;
+  saveState();
+};
+
+function renderEnd() {
+  els.bar.style.width = '100%';
+  els.gameScreen.classList.add('hide');
+  els.endScreen.classList.remove('hide');
+  els.finalScore.textContent = fa(state.score);
+}
+
+els.resetBtn.onclick = function() {
+  if (confirm('از مرحله ۱ شروع کنی؟')) newGame();
+};
+
+els.playAgain.onclick = function() { newGame(); };
+
+if (!loadState()) {
+  state = { level: 1, score: 0, order: makeOrder(), hintsLeft: 3 };
+  saveState();
+}
+
+if (state.level > TOTAL) renderEnd();
+else renderLevel();
+</script>
+</body>
+</html>
